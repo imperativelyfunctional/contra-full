@@ -785,8 +785,9 @@ class Lance extends SpriteAnimationGroupComponent<PlayerStates>
     var hitBox = hitBoxes[current!];
 
     if (other is ContraScreenHitbox && !dead) {
-      if (!dead && position.x + hitBox![0].x < gameRef.camera.position.x) {
-        position.x = gameRef.camera.position.x - hitBox[0].x;
+      if (!dead &&
+          position.x + hitBox![0].x < gameRef.camera.viewport.position.x) {
+        position.x = gameRef.camera.viewport.position.x - hitBox[0].x;
       }
       if (position.y + height > other.height) {
         die();

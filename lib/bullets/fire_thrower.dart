@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:contra/bullets/sprite_bullet.dart';
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
@@ -16,7 +18,7 @@ class FireThrowerBullets extends PositionComponent
       required super.position});
 
   @override
-  Future<void>? onLoad() {
+  FutureOr<void>? onLoad() {
     size = Vector2.zero();
     anchor = Anchor.center;
     addBullet(Vector2(10, 0));
