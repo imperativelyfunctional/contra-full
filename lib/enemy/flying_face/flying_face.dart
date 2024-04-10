@@ -14,7 +14,7 @@ class FlyingFace extends SpriteAnimationComponent with HasGameRef {
     required this.destination,
   }) {
     size = Vector2(34, 32);
-    positionType = PositionType.viewport;
+    gameRef.camera.add(this);
     anchor = Anchor.center;
   }
 
@@ -35,7 +35,7 @@ class FlyingFace extends SpriteAnimationComponent with HasGameRef {
     ], infinite: true));
     timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       gameRef.add(FlyingFaceBullet(
-        position: gameRef.camera.unprojectVector(position) + Vector2(0, 20),
+        position: gameRef.camera.localToGlobal(position) + Vector2(0, 20),
       ));
     });
     animation = await gameRef.loadSpriteAnimation(

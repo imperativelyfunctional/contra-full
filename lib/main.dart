@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' show pi, Random;
 
 import 'package:contra/bullets/bullet.dart';
 import 'package:contra/collectables/flying_weapon.dart';
@@ -13,7 +13,9 @@ import 'package:contra/player/player_states.dart';
 import 'package:contra/wall/screen_hitbox.dart';
 import 'package:contra/wall/wall.dart';
 import 'package:event/event.dart';
+import 'package:flame/camera.dart';
 import 'package:flame/components.dart' hide Timer;
+import 'package:flame/experimental.dart';
 import 'package:flame/flame.dart';
 import 'package:flame/game.dart';
 import 'package:flame/input.dart';
@@ -66,13 +68,14 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
   Future<void> onLoad() async {
     super.onLoad();
     viewPortWidth = size.x * ogViewPortWidth / size.y;
-    camera.viewport =
-        FixedResolutionViewport(Vector2(viewPortWidth, ogViewPortHeight));
+    camera.viewport = FixedResolutionViewport(
+      resolution: Vector2(viewPortWidth, ogViewPortHeight),
+    );
     var map = await TiledComponent.load('map.tmx', Vector2.all(16));
-    add(map);
+    world.add(map);
     for (var object
         in map.tileMap.getLayer<ObjectGroup>('collisions')!.objects) {
-      add(Wall(WallType.fromString(object.type),
+      world.add(Wall(WallType.fromString(object.type),
           position: Vector2(object.x, object.y),
           size: Vector2(object.width, object.height)));
     }
@@ -86,7 +89,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
       } else if (name == 'flying_faces_hide') {
         flyingFaceHideX = x;
       } else if (name == "fork") {
-        add(Fork(
+        world.add(Fork(
             position: Vector2(x, object.y), delayed: object.type == 'delayed'));
       } else if (name == 'giant_show') {
         giantShowX = x;
@@ -99,7 +102,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
       position: Vector2(30, 0),
       size: Vector2(41, 42),
     );
-    await add(player);
+    await world.add(player);
 
     var flyWeaponAnimation = await loadSpriteAnimation(
         'flying_weapon.png',
@@ -111,43 +114,41 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
         ));
 
     Timer.periodic(const Duration(seconds: 5), (timer) {
-      add(FlyingObject(
-          initialPosition: Vector2(camera.position.x - 60, 30),
+      world.add(FlyingObject(
+          initialPosition: Vector2(camera.viewport.position.x - 60, 30),
           size: Vector2(24, 24),
           animation: flyWeaponAnimation));
     });
 
     Sprite life = await loadSprite('life.png', srcSize: Vector2(8, 16));
-    add(SpriteComponent(sprite: life, position: Vector2(20, 0), priority: 1)
-      ..positionType = PositionType.viewport);
-    add(SpriteComponent(sprite: life, position: Vector2(35, 0), priority: 1)
-      ..positionType = PositionType.viewport);
-    add(SpriteComponent(sprite: life, position: Vector2(50, 0), priority: 1)
-      ..positionType = PositionType.viewport);
-    add(SpriteComponent(sprite: life, position: Vector2(65, 0), priority: 1)
-      ..positionType = PositionType.viewport);
+    camera.viewport.addAll([
+      SpriteComponent(sprite: life, position: Vector2(20, 0), priority: 1),
+      SpriteComponent(sprite: life, position: Vector2(35, 0), priority: 1),
+      SpriteComponent(sprite: life, position: Vector2(50, 0), priority: 1),
+      SpriteComponent(sprite: life, position: Vector2(65, 0), priority: 1)
+    ]);
 
-    add(ContraScreenHitbox());
+    world.add(ContraScreenHitbox());
     spawnEvents.subscribe((args) {
       player = Lance(
         'player.png',
-        position: Vector2(camera.position.x + 30, 0),
+        position: Vector2(camera.viewport.position.x + 30, 0),
         size: Vector2(41, 42),
       );
-      add(player);
+      world.add(player);
     });
 
-    add(MovingFlame(
+    world.add(MovingFlame(
         position: Vector2(768 + 8, 102 + 8),
         destination: Vector2(880 + 8, 102 + 8)));
-    add(MovingFlame(
+    world.add(MovingFlame(
         position: Vector2(880 + 8, 102 + 8),
         destination: Vector2(768 + 8, 102 + 8)));
     weaponDropEvents.subscribe((args) async {
       var weaponType = args!.weaponType;
       switch (weaponType) {
         case WeaponType.machine_gun:
-          add(Weapon.machineGun(
+          world.add(Weapon.machineGun(
               position: args.position,
               animation: await loadSpriteAnimation(
                 'weapons.png',
@@ -160,7 +161,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
               )));
           break;
         case WeaponType.spread_gun:
-          add(Weapon.spreadGun(
+          world.add(Weapon.spreadGun(
               position: args.position,
               animation: await loadSpriteAnimation(
                 'weapons.png',
@@ -173,7 +174,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
               )));
           break;
         case WeaponType.fire_thrower:
-          add(Weapon.fireThrower(
+          world.add(Weapon.fireThrower(
               position: args.position,
               animation: await loadSpriteAnimation(
                 'weapons.png',
@@ -202,25 +203,27 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
   @override
   void update(double dt) {
     super.update(dt);
-    var cameraXPos = camera.position.x;
+    var cameraXPos = camera.viewport.position.x;
     if (cameraXPos >= worldWidth - viewPortWidth && worm == null) {
       worm = Worm(position: Vector2(cameraXPos, 0));
-      add(worm!);
+      world.add(worm!);
       Timer.periodic(const Duration(milliseconds: 600), (timer) {
         Random random = Random();
 
-        add(Octopus(
+        world.add(Octopus(
             position:
                 Vector2(random.nextDouble() * cameraXPos + cameraXPos, 1)));
-        add(Octopus(
+        world.add(Octopus(
             position:
                 Vector2(random.nextDouble() * cameraXPos + cameraXPos, 1)));
       });
     }
     if (cameraXPos < worldWidth - viewPortWidth) {
-      camera.followComponent(player,
-          worldBounds: Rect.fromLTWH(
-              cameraXPos, 0, worldWidth - cameraXPos, worldHeight));
+      camera.setBounds(Rectangle.fromLTWH(
+          cameraXPos, 0, worldWidth - cameraXPos, worldHeight));
+      camera.follow(
+        player,
+      );
     }
 
     if (cameraXPos >= flyingFaceShowX && flyingFaces.isEmpty) {
@@ -229,26 +232,26 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
         destination: Vector2(size.x * 3 / 4, 20),
       );
       flyingFaces.add(leftFace);
-      add(leftFace);
+      world.add(leftFace);
       var middleFace = FlyingFace(
         position: Vector2(size.x * 3 / 4, 20),
         destination: Vector2(size.x / 4, 20),
       );
       flyingFaces.add(middleFace);
-      add(middleFace);
+      world.add(middleFace);
       var rightFace = FlyingFace(
         position: Vector2(size.x * 2 / 4, 20),
         destination: Vector2(size.x * 2 / 4, 20),
       );
       flyingFaces.add(rightFace);
-      add(rightFace);
+      world.add(rightFace);
     }
 
     if (cameraXPos >= giantShowX && giant == null) {
       giant = Giant(
           position: Vector2(cameraXPos + viewPortWidth * 3 / 4, 161 - 62),
           speedX: 50);
-      add(giant!);
+      world.add(giant!);
     } else if (cameraXPos >= giantHideX) {
       giant!.removeFromParent();
     }
@@ -262,7 +265,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
 
   @override
   KeyEventResult onKeyEvent(
-    RawKeyEvent event,
+    KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
     {
@@ -275,7 +278,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
         }
       }
 
-      if (event is RawKeyUpEvent) {
+      if (event is KeyUpEvent) {
         keyEvents.broadcast(KeyEventArgs(event.logicalKey, false));
         if (event.logicalKey == LogicalKeyboardKey.keyJ) {}
       }
@@ -292,7 +295,7 @@ class Contra extends FlameGame with KeyboardEvents, HasCollisionDetection {
           playerInfoArgs.position + barrel[playerInfoArgs.playerState]!,
           fireVelocity.first,
           fireVelocity.second);
-      add(bullet);
+      world.add(bullet);
     }
   }
 }
